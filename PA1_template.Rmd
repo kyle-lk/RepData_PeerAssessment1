@@ -6,20 +6,246 @@ output:
 ---
 
 
-## Loading and preprocessing the data
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE)
+```
+
+This file descripts my course project. reproducible research assignment.
+
+##0. Install and Load Packages
+```{r load,echo=TRUE}
+
+library(lattice)
+
+```
+
+##1. Loading and preprocessing the data 
+
+1. Load the data (i.e. read.csv())
+2. Process/transform the data (if necessary) into a format suitable for your analysis
+
+###1.1 Downloading Data
+
+we download original data from this website: 
+
+Dataset:[Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip)[52K]
+
+also, we can download in Rstudio console by R command:
+```{r download,echo=TRUE}
+
+## download dataset to R current work directory,filename "activity.zip"
+##  download.file("https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip","./acticity.zip")
+
+## decompressed dataset to current work directory
+##  unzip("activity.zip",exdir=".")
+
+
+## sometimes, I can't download dataset using URL, so I annotated them
+## I assume that you have downloaded and decompressed the data into the current directory.
+
+## loading dataset to R console,stored at variable "activity""
+  activity <- read.csv("activity.csv")
+
+```
+
+###1.2 Check Data
+
+Now, we can simply check dataset:
+```{r check, echo=TRUE}
+dim(activity)
+str(activity)
+head(activity)
+## calculate NA's number in column one
+sum(is.na(activity$steps))/nrow(activity)
+```
+
+##2. What is mean total number of steps taken per day?
+
+1. Calculate the total number of steps taken per day
+
+2. Calculate and report the mean and median of the total number of steps taken per day
+
+###2.1 Total number of steps
+
+Fist,we can calculate total number of steps taken each day:
+```{r step/day,echo=TRUE}
+step_day <- tapply(activity$steps,activity$date,sum,na.rm=TRUE)
+day_names <-names(step_day)
+step_day <- data.frame(step = step_day,day=day_names)
+barplot(step_day$step,main="Total number of steps taken each day",xlab="date(01/10/2012-30/11/2012)",ylab="steps",col="purple")
+
+###Next, we calculate **mean** and **median**, add each lines to histgram.
+## mean calculate
+abline(h=sum(step_day$step)/dim(step_day)[1],col="red")
+## median calculate
+abline(h=sort(step_day$step)[dim(step_day)[1]/2],col="blue",lty=3)
+## add legend descript lines
+legend("topleft",legend=c("mean","median"),col=c("red","blue"),lty=c(1,3),bty="n",text.col = c("red","blue"),yjust=3)
+step_mean <- sum(step_day$step)/dim(step_day)[1]
+step_median <- sort(step_day$step)[dim(step_day)[1]/2]
+
+```
+
+###2.2 Calculate mean and median value
+
+the mean of the total number of steps taken per day is `r step_mean`.
+
+the median of the total number of steps taken per day is `r step_median`.
+
+##3. What is the average daily activity pattern?
+
+1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+
+###3.1 Times series analysis
+
+This section we analysis time series problem
+First, we need calculate average steps for each day each interval
+```{r ava_steps_each_day,echo=TRUE}
+
+## each day records number
+interval <- tapply(activity$steps,activity$interval,sum,na.rm=TRUE)
+interval <- interval/61 ##normalize data,total 61 days
+plot(names(interval),interval,type="l",main="average steps for each day/5 min",col="blue",lwd=2.0,xlab="One day time series/5 min",ylab="steps")
+
+```
+
+###3.2 Calculate specific interval
+
+So, we can easily find which 5-minute interval contains the maximun number of steps
+```{r max_step,echo=TRUE}
+
+max_step<- which(interval == max(interval))
+max_step
+
+```
+The data tells us,these two month,every day's morning 8:35 our research object had maximum number of steps:`r max_step` 
+
+##4. Imputing missing values
+
+1. Calculate and report the total number of missing values in the dataset (i.e. the total number of rows with NAs)
+2. Create a new dataset that is equal to the original dataset but with the missing data filled in.
+3. Make a histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+###4.1 The total number of row with NA
+
+NA records all comes from steps avariable. but we can use `complete.cases()` function to calculate total rows contain NA value.
+
+```{r NA_count,echo=TRUE}
+
+sum(!complete.cases(activity))
+## Above number of day/interval contains NAs records.
+
+```
+
+###4.2 Refilling NA obeservations
+
+I used that day's step mean value to refill NA oberservation
+```{r NA_refill, echo=TRUE}
+## calculte every day total interval records number
+24*60/5
+## every day we will record 288 times step
+step_day$average <- step_day$step/288
+## calculate mean of steps  each day,stored at variable: ave_step
+ave_step <- rep(step_day$average,each=288)
+
+refill_data <- activity
+for (i in 1:nrow(refill_data)){
+  if (is.na(refill_data$steps[i])){
+    refill_data$steps[i] <- ave_step[i]
+  }
+}
+head(refill_data);tail(refill_data)
+sum(!complete.cases(refill_data))
+```
+
+###4.3 Recalculte mean and median
+
+```{r refill_data,echo=TRUE}
+step_day2 <- tapply(refill_data$steps,refill_data$date,sum)
+step_day2 <- data.frame(step = step_day2,day=names(step_day2))
+## plotting refilled data
+barplot(step_day2$step,main="Total number of steps taken each day(refilled NAs)",xlab="date(01/10/2012-30/11/2012)",ylab="steps",col="purple")
+
+## calculate mean and median
+step_mean2 <- sum(step_day2$step)/dim(step_day2)[1]
+step_median2 <- sort(step_day2$step)[dim(step_day2)[1]/2]
+
+```
+we can see refilled data mean=`r step_mean2`,median=`r step_median2`.
+The result are identical.refilling NA will not influence results.
+
+##5. Are there differences in activity patterns between weekdays and weekends?
+
+1. Create a new factor variable in the dataset with two levels – “weekday” and “weekend” indicating whether a given date is a weekday or weekend day.
+2. Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis). See the README file in the GitHub repository to see an example of what this plot should look like using simulated data.
+
+###5.1 Determine weekdays or weekends
+
+```{r weekdays/weekends,echo=TRUE}
+
+## created new variable contains "weekend" and"weekday" sequence
+for( i in 1:nrow(refill_data)){
+  if (i %% 7 ==0 |i %% 7 == 6){
+    refill_data$week[i] <- "Weekend"
+  }else{
+    refill_data$week[i] <-"Weekday"
+  }
+}
+
+## change variables types by as.factor() function to factor varibles
+refill_data$week <- as.factor(refill_data$week)
+
+```
+
+###5.2 Plotting the difference
+
+we can sovle this part problem like before.
+```{r ploting,echo=TRUE}
+## creating normalized interval steps data
+interval2 <- tapply(refill_data$steps,refill_data$interval,sum)
+weeks <- split(refill_data$week,refill_data$interval)
+interval2 <- interval2/61
+interval2 <- data.frame(steps=interval2,interval=names(interval2))
+
+## change interval variable to numeric
+interval2$interval <- as.character(interval2$interval)
+interval2$interval <- as.numeric(interval2$interval)
+
+
+for( i in 1:nrow(interval2)){
+  if (i %% 7 ==0 |i %% 7 == 6){
+    interval2$week[i] <- "Weekend"
+  }else{
+    interval2$week[i] <-"Weekday"
+  }
+}
+interval2$week <- as.factor(interval2$week)
+
+## plotting by lattice package function `xyplot`
+xyplot(steps~interval|week,data=interval2,type="l",layout=c(1,2),stack=TRUE,lwd=2)
+
+
+```
+
+we can find that the person's weekend is similar to the work day.
+
+Now, we finished the course project
 
 
 
-## What is mean total number of steps taken per day?
 
 
 
-## What is the average daily activity pattern?
 
 
 
-## Imputing missing values
 
 
 
-## Are there differences in activity patterns between weekdays and weekends?
+  
+  
+  
+  
+
+
